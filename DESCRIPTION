@@ -10,8 +10,8 @@ Authors@R: c(
            comment = c(ORCID = "0000-0001-5148-6731")))
 Description: A paragraph providing a full description of the project (on 
     several lines...)
-URL: https://github.com/beckyfisher/bruvdists
-BugReports: https://github.com/beckyfisher/bruvdists/issues
+URL: https://github.com/open-AIMS/bruvdists
+BugReports: https://github.com/open-AIMS/bruvdists/issues
 License: GPL (>= 2)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

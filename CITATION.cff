@@ -22,9 +22,9 @@ preferred-citation:
   - name: Fisher Rebecca
   year: '2025'
   notes: R package version 0.0.0.9000
-  url: https://github.com/beckyfisher/bruvdists
-repository-code: https://github.com/beckyfisher/bruvdists
-url: https://github.com/beckyfisher/bruvdists
+  url: https://github.com/open-AIMS/bruvdists
+repository-code: https://github.com/open-AIMS/bruvdists
+url: https://github.com/open-AIMS/bruvdists
 contact:
 - family-names: Fisher
   given-names: Rebecca
