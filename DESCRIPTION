@@ -1,22 +1,38 @@
+
 Package: bruvdists
 Type: Package
-Title: The Title of the Project
+Title: Defining Statistical Distributions Based on Functional Traits
 Version: 0.0.0.9000
 Authors@R: c(
     person(given   = "Rebecca",
            family  = "Fisher",
            role    = c("aut", "cre", "cph"),
            email   = "r.fisher@aims.gov.au",
-           comment = c(ORCID = "0000-0001-5148-6731")))
-Description: A paragraph providing a full description of the project (on 
-    several lines...)
+           comment = c(ORCID = "0000-0001-5148-6731")),
+    person(given   = "Diego",
+           family  = "Barneche",
+           role    = "aut",
+           email   = "D.Barneche@aims.gov.au",
+           comment = c(ORCID = "0000-0002-4568-2362")),
+    person(given   = "Katherine",
+           family  = "Cure",
+           role    = "aut",
+           email   = "K.Cure@aims.gov.au",
+           comment = c(ORCID = "0000-0002-2922-6391")),
+    person(given   = "Matthew",
+           family  = "Birt",
+           role    = "aut",
+           email   = "M.Birt@aims.gov.au",
+           comment = c(ORCID = "0000-0003-2233-0716"))
+  )
+Description: Here we explore appropriate statistical distributions for ensuring robust inference of BRUV data.
 URL: https://github.com/open-AIMS/bruvdists
 BugReports: https://github.com/open-AIMS/bruvdists/issues
 License: GPL (>= 2)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Suggests: 
+Suggests:
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)

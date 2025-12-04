@@ -4,20 +4,27 @@
 \name{bruvdists-package}
 \alias{bruvdists}
 \alias{bruvdists-package}
-\title{bruvdists: The Title of the Project}
+\title{bruvdists: Defining Statistical Distributions Based on Functional Traits}
 \description{
-A paragraph providing a full description of the project (on several lines...)
+Here we explore appropriate statistical distributions for ensuring robust inference of BRUV data.
 }
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/beckyfisher/bruvdists}
-  \item Report bugs at \url{https://github.com/beckyfisher/bruvdists/issues}
+  \item \url{https://github.com/open-AIMS/bruvdists}
+  \item Report bugs at \url{https://github.com/open-AIMS/bruvdists/issues}
 }
 
 }
 \author{
 \strong{Maintainer}: Rebecca Fisher \email{r.fisher@aims.gov.au} (\href{https://orcid.org/0000-0001-5148-6731}{ORCID}) [copyright holder]
+
+Authors:
+\itemize{
+  \item Diego Barneche \email{D.Barneche@aims.gov.au} (\href{https://orcid.org/0000-0002-4568-2362}{ORCID})
+  \item Katherine Cure \email{K.Cure@aims.gov.au} (\href{https://orcid.org/0000-0002-2922-6391}{ORCID})
+  \item Matthew Birt \email{M.Birt@aims.gov.au} (\href{https://orcid.org/0000-0003-2233-0716}{ORCID})
+}
 
 }
 \keyword{internal}
