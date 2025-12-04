@@ -1,0 +1,10 @@
+citHeader("To cite bruvdists in publications use:")
+
+bibentry(
+  bibtype = "Manual",
+  title   = "bruvdists: {An} {R} package to ...",
+  author  = c(person("Fisher Rebecca")),
+  year    = "2025",
+  note    = "R package version 0.0.0.9000",
+  url     = "https://github.com/beckyfisher/bruvdists"
+)
