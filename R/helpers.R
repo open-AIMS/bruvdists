@@ -56,6 +56,7 @@ extract_dispersion <- function(model) {
 #' Single-simulation function
 #' 
 #' @return A named list with estimates for poisson, nbinom and beta-backtransformed
+#' @export
 run_one_sim <- function(sim_i, lambda, n_obs) {
   # sim_i included to allow reproducible splits if desired
   y <- rpois(n_obs, lambda)
@@ -127,6 +128,8 @@ run_one_sim <- function(sim_i, lambda, n_obs) {
 }
 
 #' helper summaries
+#' 
+#' @export
 summarise_bias_rmse <- function(est, truth) {
   ok <- !is.na(est) & !is.na(truth)
   if(sum(ok) == 0) return(tibble(n_ok = 0, bias = NA_real_, rmse = NA_real_))

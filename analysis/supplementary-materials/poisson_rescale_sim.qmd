@@ -11,29 +11,30 @@ to_install <- required_pkgs[!(required_pkgs %in% installed.packages()[, "Package
 if(length(to_install)) {
   install.packages(to_install, repos = "https://cloud.r-project.org")
 }
-
+library(bruvdists)
 library(glmmTMB)
 library(dplyr)
 library(tibble)
 library(purrr)
 library(ggplot2)
 library(broom.mixed)
-library(parallel)
+library(future)
+library(future.apply)
 
 set.seed(2025)
 
-# storage for results
-results <- list()
-
-# helper to safely fit glmmTMB and return NA on failure
-safe_glmmTMB <- function(formula, data, family) {
-  tryCatch({
-    glmmTMB::glmmTMB(formula = formula, data = data, family = family)
-  }, error = function(e) {
-    warning("glmmTMB fit failed: ", conditionMessage(e))
-    NULL
-  })
+# parallel settings
+available_cores <- parallel::detectCores(logical = FALSE)
+# Use all but 1 core if possible, but at least 1
+mc_cores_want <- max(1, available_cores - 1)
+if(.Platform$OS.type == "windows") {
+  message("Windows detected: mclapply is not available; falling back to sequential lapply.")
+  mc_cores <- 1
+} else {
+  mc_cores <- mc_cores_want
+  message("Using mc.cores = ", mc_cores)
 }
+
 ```
 ## Introduction
 
@@ -53,7 +54,7 @@ Scales the raw counts by dividing by the observed maximum (so the maximum become
 
 Aggregates bias and RMSE for mean & variance across the 1000 sims for each combination and model.
 
-### parameters
+### Parameters
 
 ```{r}
 #| label: params
@@ -65,230 +66,138 @@ eps_trunc <- 1e-6                # to move any exact 1.0 to 1 - eps for beta
 ```
 
 
-### loop over combos
+### Run sims
 
 ```{r}
 #| label: runsims
 #| cache: true
 #| warning: false
 #| echo: false
-rowidx <- 1
-for(lambda in lambdas) {
-  for(n_obs in ns) {
 
-    # containers for metrics across sims
-    poiss_mean_est <- numeric(nsims)
-    poiss_var_est  <- numeric(nsims)
-    poiss_mean_true <- numeric(nsims)
-    poiss_var_true  <- numeric(nsims)
+if (mc_cores > 1) {
+  plan(multisession, workers = mc_cores)  # portable parallelism
+  # If you're on Linux/macOS and prefer forked processes:
+  # plan(multicore, workers = mc_cores)
+} else {
+  plan(sequential)
+}
+all_results <- list()
+progress_total <- length(lambdas) * length(ns)
+progress_counter <- 0
 
-    beta_mean_est_back <- numeric(nsims)
-    beta_var_est_back  <- numeric(nsims)
-    beta_mean_true <- numeric(nsims)
-    beta_var_true  <- numeric(nsims)
-
-    for(sim in 1:nsims) {
-      # simulate Poisson data
-      y <- rpois(n_obs, lambda = lambda)
-
-      # true sample moments (these are the "observed" true mean/var for this dataset)
-      mean_y <- mean(y)
-      var_y  <- var(y)  # sample variance
-
-      # store true (we'll compare model outputs back to these)
-      poiss_mean_true[sim] <- mean_y
-      poiss_var_true[sim]  <- var_y
-      beta_mean_true[sim]  <- mean_y
-      beta_var_true[sim]   <- var_y
-
-      # -----------------------
-      # Fit Poisson (glmmTMB) - intercept only
-      # -----------------------
-      dat_p <- data.frame(y = y)
-      m_p <- safe_glmmTMB(y ~ 1, data = dat_p, family = poisson(link = "log"))
-      if(!is.null(m_p)) {
-        # intercept (log scale)
-        intercept <- as.numeric(fixef(m_p)$cond[1])
-        mu_hat <- exp(intercept)            # fitted mean on original count scale
-        # For a Poisson model the model-implied variance = mean (no overdispersion parameter)
-        var_hat <- mu_hat
-
-        poiss_mean_est[sim] <- mu_hat
-        poiss_var_est[sim]  <- var_hat
-      } else {
-        poiss_mean_est[sim] <- NA
-        poiss_var_est[sim]  <- NA
-      }
-
-      # -----------------------
-      # Prepare data for Beta model
-      # -----------------------
-      max_y <- max(y)
-      if(max_y == 0) {
-        # unlikely for lambda >= 10, but guard against it:
-        # if everything is zero, set scaled values to very small positive values
-        y_scaled <- rep(eps_trunc, length(y))
-        max_y_for_backtransform <- 1 # to avoid dividing by zero - but this will make backtransform trivial
-      } else {
-        y_scaled <- y / max_y
-        # truncate exact 1s to slightly less than 1 so Beta model is valid
-        y_scaled[y_scaled >= 1] <- 1 - eps_trunc
-        max_y_for_backtransform <- max_y
-      }
-
-      dat_b <- data.frame(y_scaled = y_scaled)
-
-      # Fit Beta model (intercept-only) with logit link
-      # glmmTMB has beta_family() for Beta regression
-      m_b <- safe_glmmTMB(y_scaled ~ 1, data = dat_b, family = betabinomial()) # placeholder
-      # NOTE: use correct beta_family in glmmTMB:
-      # in many glmmTMB versions it is 'beta_family(link = "logit")'
-      # but to be robust, try that:
-      if(!is.null(m_b)) {
-        # if the placeholder betabinomial used (unlikely), m_b may be something else.
-        # We'll re-fit correctly below (try-catch)
-        m_b <- NULL
-      }
-      if(is.null(m_b)) {
-        m_b <- tryCatch({
-          glmmTMB::glmmTMB(y_scaled ~ 1, data = dat_b, family = glmmTMB::beta_family(link = "logit"))
-        }, error = function(e) {
-          # try alternate constructor (older versions might use "beta_family" in a different way)
-          tryCatch({
-            glmmTMB::glmmTMB(y_scaled ~ 1, data = dat_b, family = stats::quasi(link = "logit"))
-          }, error = function(e2) {
-            warning("Beta-model fit failed (both attempts).")
-            NULL
-          })
-        })
-      }
-
-      if(!is.null(m_b)) {
-        # extract intercept for mu on logit scale
-        intercept_b <- as.numeric(fixef(m_b)$cond[1])
-        mu_scaled_hat <- plogis(intercept_b)  # estimated mean on scaled (0,1) scale
-
-        # extract precision phi (phi>0). In glmmTMB the dispersion/precision fixed effect is in fixef(... )$disp
-        phi_hat <- NA
-        try({
-          if(!is.null(fixef(m_b)$disp)) {
-            # usually the dispersion/precision is modeled on log scale, so extract and exponentiate
-            disp_coef <- as.numeric(fixef(m_b)$disp[1])
-            phi_hat <- exp(disp_coef)
-          } else {
-            # alternative extraction via summary
-            s <- summary(m_b)
-            if("disp" %in% names(s$coefficients)) {
-              disp_coef <- as.numeric(s$coefficients$disp[ , "Estimate"][1])
-              phi_hat <- exp(disp_coef)
-            }
-          }
-        }, silent = TRUE)
-
-        # If phi not found, attempt to extract from sigma() or fit$par
-        if(is.na(phi_hat)) {
-          # try reading from m_b$fit$par ; parameter names vary between versions - try heuristics
-          try({
-            pnames <- names(m_b$fit$par)
-            # many times the dispersion is stored in "theta" or "phi", try matching
-            idx <- grep("phi|theta|disp", pnames, ignore.case = TRUE)
-            if(length(idx) > 0) {
-              phi_hat <- exp(m_b$fit$par[idx[1]])
-            }
-          }, silent = TRUE)
-        }
-
-        if(is.na(phi_hat)) {
-          # fallback: if cannot extract, set phi_hat = large number so beta var small (conservative)
-          phi_hat <- NA
-          warning("Could not extract beta precision (phi) from glmmTMB fit; will set NA for Beta variance.")
-        }
-
-        # Beta variance formula for (mu, phi): Var(Y) = mu*(1-mu)/(1+phi)
-        if(!is.na(phi_hat)) {
-          var_scaled_hat <- mu_scaled_hat * (1 - mu_scaled_hat) / (1 + phi_hat)
-        } else {
-          var_scaled_hat <- NA
-        }
-
-        # back-transform to original count scale:
-        mean_back <- mu_scaled_hat * max_y_for_backtransform
-        var_back  <- if(!is.na(var_scaled_hat)) var_scaled_hat * (max_y_for_backtransform^2) else NA
-
-        beta_mean_est_back[sim] <- mean_back
-        beta_var_est_back[sim]  <- var_back
-      } else {
-        beta_mean_est_back[sim] <- NA
-        beta_var_est_back[sim]  <- NA
-      }
-    } # end sims
-
-    # compute summary metrics: bias and RMSE for mean & variance, for each model
-    summarise_metrics <- function(est, truth) {
-      ok <- !is.na(est) & !is.na(truth)
-      est2 <- est[ok]; tr2 <- truth[ok]
-      if(length(est2) == 0) return(list(n = 0, bias = NA, rmse = NA, sd_est = NA))
-      bias <- mean(est2 - tr2)
-      rmse <- sqrt(mean((est2 - tr2)^2))
-      list(n = length(est2), bias = bias, rmse = rmse, sd_est = sd(est2))
-    }
-
-    # Poisson model metrics (mean)
-    pm_mean <- summarise_metrics(poiss_mean_est, poiss_mean_true)
-    pm_var  <- summarise_metrics(poiss_var_est, poiss_var_true)
-
-    # Beta-backtransformed metrics
-    bm_mean <- summarise_metrics(beta_mean_est_back, beta_mean_true)
-    bm_var  <- summarise_metrics(beta_var_est_back, beta_var_true)
-
-    # collect results in a data.frame row
-    row <- tibble::tibble(
-      lambda = lambda,
-      n_obs  = n_obs,
-      model = c("poisson_glmmTMB", "beta_glmmTMB_backtrans"),
-      metric = rep(c("mean", "variance"), each = 1),
-      bias = c(pm_mean$bias, bm_mean$bias),
-      rmse = c(pm_mean$rmse, bm_mean$rmse),
-      n_success = c(pm_mean$n, bm_mean$n)
+for (lambda in lambdas) {
+  for (n_obs in ns) {
+    progress_counter <- progress_counter + 1
+    message(sprintf("Starting lambda = %g, n_obs = %d   (%d/%d)",
+                    lambda, n_obs, progress_counter, progress_total))
+    
+    sim_indices <- seq_len(nsims)
+    
+    ## --- Option A: future_lapply (recommended drop-in for mclapply) ---
+    sims_out <- future_lapply(
+      sim_indices,
+      function(i) run_one_sim(i, lambda = lambda, n_obs = n_obs),
+      future.seed = TRUE   # reproducible RNG streams
     )
-
-    # for variance (append second row for variance)
-    row2 <- tibble::tibble(
-      lambda = lambda,
-      n_obs  = n_obs,
-      model = c("poisson_glmmTMB", "beta_glmmTMB_backtrans"),
-      metric = rep(c("mean", "variance"), each = 1),
-      bias = c(pm_var$bias, bm_var$bias),
-      rmse = c(pm_var$rmse, bm_var$rmse),
-      n_success = c(pm_var$n, bm_var$n)
-    )
-
-    # combine (structure to give 4 rows: Poisson-mean, Beta-mean, Poisson-var, Beta-var)
-    # we'll store as a list element for later rbind
-    results[[paste0("lam", lambda, "_n", n_obs)]] <- dplyr::bind_rows(
-      tibble(lambda=lambda,n_obs=n_obs, model="poisson_glmmTMB", metric="mean",
-             bias=pm_mean$bias, rmse=pm_mean$rmse, n_success=pm_mean$n),
-      tibble(lambda=lambda,n_obs=n_obs, model="beta_glmmTMB_backtrans", metric="mean",
-             bias=bm_mean$bias, rmse=bm_mean$rmse, n_success=bm_mean$n),
-      tibble(lambda=lambda,n_obs=n_obs, model="poisson_glmmTMB", metric="variance",
-             bias=pm_var$bias, rmse=pm_var$rmse, n_success=pm_var$n),
-      tibble(lambda=lambda,n_obs=n_obs, model="beta_glmmTMB_backtrans", metric="variance",
-             bias=bm_var$bias, rmse=bm_var$rmse, n_success=bm_var$n)
-    )
-
-    cat("Done lambda=", lambda, " n=", n_obs, "\n")
+    
+    ## --- Option B: strictly future_apply over rows (MARGIN = 1) ---
+    # sims_out <- future_apply(
+    #   matrix(sim_indices),  # one-column matrix of indices
+    #   MARGIN = 1,
+    #   FUN = function(i) run_one_sim(i, lambda = lambda, n_obs = n_obs),
+    #   future.seed = TRUE
+    # )
+    
+    # Convert list of named lists to tibble
+    df <- purrr::map_dfr(sims_out, ~ as_tibble(.x))
+    
+    # Add metadata
+    df <- df %>%
+      mutate(lambda = lambda, n_obs = n_obs, sim = seq_len(n()))
+    
+    all_results[[paste0("lam", lambda, "_n", n_obs)]] <- df
+    message(sprintf("Finished lambda=%g, n=%d  (rows=%d)", lambda, n_obs, nrow(df)))
   }
 }
+
+# Optional: return to sequential when done
+plan(sequential)
+
+sim_df <- bind_rows(all_results, .id = "scenario")
+
 ```
 
 ## Results
 
 ```{r}
 #| label: results
-final_res <- dplyr::bind_rows(results)
+summary_rows <- list()
 
-# present results
-final_res %>% arrange(lambda, n_obs, model, metric) %>% print(n = Inf)
+for(lambda in lambdas) {
+  for(n_obs in ns) {
+    sub <- sim_df %>% filter(lambda == lambda, n_obs == n_obs)
+
+    # Poisson mean
+    s_pm_mean <- summarise_bias_rmse(sub$mu_p_hat, sub$mean_true) %>% mutate(model = "poisson", metric = "mean")
+    s_pm_var  <- summarise_bias_rmse(sub$var_p_hat, sub$var_true)  %>% mutate(model = "poisson", metric = "variance")
+
+    # Negative binomial
+    s_nb_mean <- summarise_bias_rmse(sub$mu_nb_hat, sub$mean_true) %>% mutate(model = "nbinom2", metric = "mean")
+    s_nb_var  <- summarise_bias_rmse(sub$var_nb_hat, sub$var_true)  %>% mutate(model = "nbinom2", metric = "variance")
+
+    # Beta backtransformed
+    s_b_mean  <- summarise_bias_rmse(sub$mu_b_back, sub$mean_true) %>% mutate(model = "beta_back", metric = "mean")
+    s_b_var   <- summarise_bias_rmse(sub$var_b_back, sub$var_true)  %>% mutate(model = "beta_back", metric = "variance")
+
+    block <- bind_rows(
+      s_pm_mean, s_b_mean, s_nb_mean,
+      s_pm_var,  s_b_var,  s_nb_var
+    ) %>%
+      mutate(lambda = lambda, n_obs = n_obs) %>%
+      select(lambda, n_obs, model, metric, everything())
+
+    summary_rows[[paste0("lam", lambda, "_n", n_obs)]] <- block
+  }
+}
+
+summary_df <- bind_rows(summary_rows)
+
+# reorder factors for plotting
+summary_df <- summary_df %>%
+  mutate(model = factor(model, levels = c("poisson", "nbinom2", "beta_back")),
+         metric = factor(metric, levels = c("mean", "variance")))
+
+# print summary table
+print(summary_df)
+```
+
+### Bias plot
+
+```{r}
+#| label: plots
+
+p_bias <- ggplot(summary_df, aes(x = factor(n_obs), y = bias, color = model, group = model)) +
+  geom_point(size = 3) +
+  geom_line() +
+  facet_wrap(~ metric + lambda, scales = "free_y", ncol = length(lambdas)) +
+  labs(title = "Bias of model estimates (mean and variance)",
+       x = "Number of observations (n)",
+       y = "Bias (estimate - observed sample moment)") +
+  theme_minimal()
+
+print(p_bias)
+
+# RMSE plot
+p_rmse <- ggplot(summary_df, aes(x = factor(n_obs), y = rmse, color = model, group = model)) +
+  geom_point(size = 3) +
+  geom_line() +
+  facet_wrap(~ metric + lambda, scales = "free_y", ncol = length(lambdas)) +
+  labs(title = "RMSE of model estimates (mean and variance)",
+       x = "Number of observations (n)",
+       y = "RMSE (root mean squared error)") +
+  theme_minimal()
+
+print(p_rmse)
 ```
 
 

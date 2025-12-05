@@ -1,10 +1,9 @@
-base
-methods
-datasets
-utils
-grDevices
-graphics
-stats
 glmmTMB
 dplyr
 broom.mixed
+bruvdists
+tibble
+purrr
+ggplot2
+future
+future.apply

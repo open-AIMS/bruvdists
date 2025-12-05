@@ -98,7 +98,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>This simulation explores how modelling Poisson distributed data on the scale changes the outcomes of the inference.</p>
+<p>This simulation explores how modelling Poisson distributed data on the beta scale changes the outcomes of the inference.</p>
 </section>
 <section id="methods" class="level2">
 <h2 class="anchored" data-anchor-id="methods">Methods</h2>
@@ -109,7 +109,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Scales the raw counts by dividing by the observed maximum (so the maximum becomes 1), truncates any exact 1 to 1 - eps (so everything is in (0,1)), fits a glmmTMB Beta model (beta_family(link=“logit”)) to the scaled data, and converts the Beta-model estimates back to the original count scale (mean and variance) for comparison to the original Poisson-generated mean &amp; variance.</p>
 <p>Aggregates bias and RMSE for mean &amp; variance across the 1000 sims for each combination and model.</p>
 <section id="parameters" class="level3">
-<h3 class="anchored" data-anchor-id="parameters">parameters</h3>
+<h3 class="anchored" data-anchor-id="parameters">Parameters</h3>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>lambdas <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">10</span>, <span class="dv">100</span>, <span class="dv">1000</span>)      <span class="co"># "sampling effort scenarios" interpreted as true Poisson means</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>ns <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">10</span>, <span class="dv">100</span>, <span class="dv">1000</span>)           <span class="co"># numbers of observations per simulated dataset</span></span>
@@ -117,88 +117,108 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>eps_trunc <span class="ot">&lt;-</span> <span class="fl">1e-6</span>                <span class="co"># to move any exact 1.0 to 1 - eps for beta</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
-<section id="loop-over-combos" class="level3">
-<h3 class="anchored" data-anchor-id="loop-over-combos">loop over combos</h3>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 10  n= 10 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 10  n= 100 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 10  n= 1000 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 100  n= 10 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 100  n= 100 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 100  n= 1000 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 1000  n= 10 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 1000  n= 100 </code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Done lambda= 1000  n= 1000 </code></pre>
-</div>
-</div>
+<section id="run-sims" class="level3">
+<h3 class="anchored" data-anchor-id="run-sims">Run sims</h3>
 </section>
 </section>
 <section id="results" class="level2">
 <h2 class="anchored" data-anchor-id="results">Results</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>final_res <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(results)</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># present results</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>final_res <span class="sc">%&gt;%</span> <span class="fu">arrange</span>(lambda, n_obs, model, metric) <span class="sc">%&gt;%</span> <span class="fu">print</span>(<span class="at">n =</span> <span class="cn">Inf</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>summary_rows <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(lambda <span class="cf">in</span> lambdas) {</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(n_obs <span class="cf">in</span> ns) {</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    sub <span class="ot">&lt;-</span> sim_df <span class="sc">%&gt;%</span> <span class="fu">filter</span>(lambda <span class="sc">==</span> lambda, n_obs <span class="sc">==</span> n_obs)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Poisson mean</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    s_pm_mean <span class="ot">&lt;-</span> <span class="fu">summarise_bias_rmse</span>(sub<span class="sc">$</span>mu_p_hat, sub<span class="sc">$</span>mean_true) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"poisson"</span>, <span class="at">metric =</span> <span class="st">"mean"</span>)</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    s_pm_var  <span class="ot">&lt;-</span> <span class="fu">summarise_bias_rmse</span>(sub<span class="sc">$</span>var_p_hat, sub<span class="sc">$</span>var_true)  <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"poisson"</span>, <span class="at">metric =</span> <span class="st">"variance"</span>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Negative binomial</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    s_nb_mean <span class="ot">&lt;-</span> <span class="fu">summarise_bias_rmse</span>(sub<span class="sc">$</span>mu_nb_hat, sub<span class="sc">$</span>mean_true) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"nbinom2"</span>, <span class="at">metric =</span> <span class="st">"mean"</span>)</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    s_nb_var  <span class="ot">&lt;-</span> <span class="fu">summarise_bias_rmse</span>(sub<span class="sc">$</span>var_nb_hat, sub<span class="sc">$</span>var_true)  <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"nbinom2"</span>, <span class="at">metric =</span> <span class="st">"variance"</span>)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Beta backtransformed</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    s_b_mean  <span class="ot">&lt;-</span> <span class="fu">summarise_bias_rmse</span>(sub<span class="sc">$</span>mu_b_back, sub<span class="sc">$</span>mean_true) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"beta_back"</span>, <span class="at">metric =</span> <span class="st">"mean"</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    s_b_var   <span class="ot">&lt;-</span> <span class="fu">summarise_bias_rmse</span>(sub<span class="sc">$</span>var_b_back, sub<span class="sc">$</span>var_true)  <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"beta_back"</span>, <span class="at">metric =</span> <span class="st">"variance"</span>)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    block <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>      s_pm_mean, s_b_mean, s_nb_mean,</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>      s_pm_var,  s_b_var,  s_nb_var</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">lambda =</span> lambda, <span class="at">n_obs =</span> n_obs) <span class="sc">%&gt;%</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>      <span class="fu">select</span>(lambda, n_obs, model, metric, <span class="fu">everything</span>())</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    summary_rows[[<span class="fu">paste0</span>(<span class="st">"lam"</span>, lambda, <span class="st">"_n"</span>, n_obs)]] <span class="ot">&lt;-</span> block</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>summary_df <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(summary_rows)</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co"># reorder factors for plotting</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>summary_df <span class="ot">&lt;-</span> summary_df <span class="sc">%&gt;%</span></span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">model =</span> <span class="fu">factor</span>(model, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"poisson"</span>, <span class="st">"nbinom2"</span>, <span class="st">"beta_back"</span>)),</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>         <span class="at">metric =</span> <span class="fu">factor</span>(metric, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"variance"</span>)))</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="co"># print summary table</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(summary_df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 36 × 7
-   lambda n_obs model                  metric        bias     rmse n_success
-    &lt;dbl&gt; &lt;dbl&gt; &lt;chr&gt;                  &lt;chr&gt;        &lt;dbl&gt;    &lt;dbl&gt;     &lt;int&gt;
- 1     10    10 beta_glmmTMB_backtrans mean      1.05e+ 0 1.16e+ 0      1000
- 2     10    10 beta_glmmTMB_backtrans variance  8.08e+ 0 9.45e+ 0      1000
- 3     10    10 poisson_glmmTMB        mean      3.11e- 9 2.46e- 8      1000
- 4     10    10 poisson_glmmTMB        variance  2.05e- 1 4.50e+ 0      1000
- 5     10   100 beta_glmmTMB_backtrans mean      4.92e- 1 5.15e- 1       997
- 6     10   100 beta_glmmTMB_backtrans variance  6.43e+ 0 6.78e+ 0       997
- 7     10   100 poisson_glmmTMB        mean     -2.53e-11 6.27e-11      1000
- 8     10   100 poisson_glmmTMB        variance  1.03e- 1 1.46e+ 0      1000
- 9     10  1000 beta_glmmTMB_backtrans mean      1.23e- 1 1.31e- 1       955
-10     10  1000 beta_glmmTMB_backtrans variance  1.70e+ 0 1.83e+ 0       955
-11     10  1000 poisson_glmmTMB        mean      1.68e- 9 3.86e- 8      1000
-12     10  1000 poisson_glmmTMB        variance  9.74e- 3 4.48e- 1      1000
-13    100    10 beta_glmmTMB_backtrans mean      1.58e+ 0 1.84e+ 0      1000
-14    100    10 beta_glmmTMB_backtrans variance  2.00e+ 2 2.29e+ 2      1000
-15    100    10 poisson_glmmTMB        mean     -3.91e- 8 6.33e- 8      1000
-16    100    10 poisson_glmmTMB        variance -1.69e+ 0 4.83e+ 1      1000
-17    100   100 beta_glmmTMB_backtrans mean      6.40e- 1 6.67e- 1      1000
-18    100   100 beta_glmmTMB_backtrans variance  1.05e+ 2 1.09e+ 2      1000
-19    100   100 poisson_glmmTMB        mean     -3.30e- 8 3.55e- 8      1000
-20    100   100 poisson_glmmTMB        variance  4.91e- 1 1.43e+ 1      1000
-21    100  1000 beta_glmmTMB_backtrans mean      1.71e- 1 1.74e- 1      1000
-22    100  1000 beta_glmmTMB_backtrans variance  2.82e+ 1 2.87e+ 1      1000
-23    100  1000 poisson_glmmTMB        mean     -3.20e- 8 3.22e- 8      1000
-24    100  1000 poisson_glmmTMB        variance  4.21e- 2 4.55e+ 0      1000
-25   1000    10 beta_glmmTMB_backtrans mean      1.76e+ 0 2.10e+ 0      1000
-26   1000    10 beta_glmmTMB_backtrans variance  2.92e+ 3 3.45e+ 3      1000
-27   1000    10 poisson_glmmTMB        mean      6.13e- 6 1.05e- 5      1000
-28   1000    10 poisson_glmmTMB        variance -1.39e+ 1 4.70e+ 2      1000
-29   1000   100 beta_glmmTMB_backtrans mean      6.58e- 1 6.88e- 1      1000
-30   1000   100 beta_glmmTMB_backtrans variance  1.22e+ 3 1.28e+ 3      1000
-31   1000   100 poisson_glmmTMB        mean      5.58e- 6 9.80e- 6      1000
-32   1000   100 poisson_glmmTMB        variance -1.46e+ 0 1.39e+ 2      1000
-33   1000  1000 beta_glmmTMB_backtrans mean      1.86e- 1 1.88e- 1      1000
-34   1000  1000 beta_glmmTMB_backtrans variance  3.49e+ 2 3.52e+ 2      1000
-35   1000  1000 poisson_glmmTMB        mean      5.28e- 6 9.50e- 6      1000
-36   1000  1000 poisson_glmmTMB        variance -1.32e+ 0 4.57e+ 1      1000</code></pre>
+<pre><code># A tibble: 54 × 7
+   lambda n_obs model     metric    n_ok          bias          rmse
+    &lt;dbl&gt; &lt;dbl&gt; &lt;fct&gt;     &lt;fct&gt;    &lt;int&gt;         &lt;dbl&gt;         &lt;dbl&gt;
+ 1     10    10 poisson   mean      9000   0.00000191     0.00000573
+ 2     10    10 beta_back mean      9000   0.737          1.06      
+ 3     10    10 nbinom2   mean      9000  -0.000000445    0.0000209 
+ 4     10    10 poisson   variance  9000   0.579        157.        
+ 5     10    10 beta_back variance  9000 532.          1205.        
+ 6     10    10 nbinom2   variance  9000  23.3          104.        
+ 7     10   100 poisson   mean      9000   0.00000191     0.00000573
+ 8     10   100 beta_back mean      9000   0.737          1.06      
+ 9     10   100 nbinom2   mean      9000  -0.000000445    0.0000209 
+10     10   100 poisson   variance  9000   0.579        157.        
+# ℹ 44 more rows</code></pre>
 </div>
 </div>
+<section id="bias-plot" class="level3">
+<h3 class="anchored" data-anchor-id="bias-plot">Bias plot</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>p_bias <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(summary_df, <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">factor</span>(n_obs), <span class="at">y =</span> bias, <span class="at">color =</span> model, <span class="at">group =</span> model)) <span class="sc">+</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>() <span class="sc">+</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> metric <span class="sc">+</span> lambda, <span class="at">scales =</span> <span class="st">"free_y"</span>, <span class="at">ncol =</span> <span class="fu">length</span>(lambdas)) <span class="sc">+</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Bias of model estimates (mean and variance)"</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Number of observations (n)"</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Bias (estimate - observed sample moment)"</span>) <span class="sc">+</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(p_bias)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="poisson_rescale_sim_files/figure-html/plots-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># RMSE plot</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>p_rmse <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(summary_df, <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">factor</span>(n_obs), <span class="at">y =</span> rmse, <span class="at">color =</span> model, <span class="at">group =</span> model)) <span class="sc">+</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>() <span class="sc">+</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> metric <span class="sc">+</span> lambda, <span class="at">scales =</span> <span class="st">"free_y"</span>, <span class="at">ncol =</span> <span class="fu">length</span>(lambdas)) <span class="sc">+</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"RMSE of model estimates (mean and variance)"</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Number of observations (n)"</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"RMSE (root mean squared error)"</span>) <span class="sc">+</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(p_rmse)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="poisson_rescale_sim_files/figure-html/plots-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
 </section>
 
 </main>
